@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash Loan Arbitrage Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <!-- Solana Web3.js -->
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        'dark-bg': '#181818',
+                        'dark-card': '#2A2A2A',
+                        'dark-border': '#404040'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .dark .glass-effect {
+            background: rgba(42, 42, 42, 0.8);
+        }
+        .pulse-primary {
+            animation: pulse-primary 2s infinite;
+        }
+        @keyframes pulse-primary {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-white dark:bg-dark-bg text-gray-900 dark:text-white transition-colors duration-300">
+    <!-- Navigation -->
+    <nav class="bg-white/80 dark:bg-dark-card/80 backdrop-blur-md border-b border-gray-200 dark:border-dark-border sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-gradient-to-r from-primary to-purple-600 rounded-lg flex items-center justify-center">
+                        <span class="text-white font-bold text-sm">FL</span>
+                    </div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                        Flash Loan Arbitrage Bot
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-500 rounded-full pulse-primary"></div>
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Solana Network</span>
+                    </div>
+                    <div class="flex items-center space-x-2 bg-green-100 dark:bg-green-900/20 px-3 py-2 rounded-lg">
+                        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span class="text-xs text-green-700 dark:text-green-300 font-medium">Auto-Connected</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Status Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Active Loans</p>
+                        <p class="text-2xl font-bold text-primary" id="activeLoanCount">0</p>
+                    </div>
+                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Total Profit</p>
+                        <p class="text-2xl font-bold text-green-500" id="totalProfit">$0.00</p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Success Rate</p>
+                        <p class="text-2xl font-bold text-blue-500" id="successRate">0%</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Bot Status</p>
+                        <p class="text-2xl font-bold" id="botStatus">
+                            <span class="text-red-500">Inactive</span>
+                        </p>
+                    </div>
+                    <div class="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                        <div class="w-3 h-3 bg-red-500 rounded-full" id="botStatusIndicator"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Controls Tab Navigation -->
+        <div class="bg-white dark:bg-dark-card rounded-xl border border-gray-200 dark:border-dark-border shadow-sm mb-8">
+            <div class="flex border-b border-gray-200 dark:border-dark-border">
+                <button class="tab-btn active px-6 py-4 text-sm font-medium border-b-2 border-primary text-primary" data-tab="config">
+                    Configuration
+                </button>
+                <button class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" data-tab="strategies">
+                    Strategies
+                </button>
+                <button class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" data-tab="risk">
+                    Risk Management
+                </button>
+                <button class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" data-tab="analytics">
+                    Analytics
+                </button>
+                <button class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" data-tab="alerts">
+                    Alerts
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Main Content Area -->
+            <div class="lg:col-span-2">
+                <div class="bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                    <h2 class="text-xl font-semibold mb-6 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                        Flash Loan Configuration
+                    </h2>
+
+                    <!-- Tab Content -->
+                    <div id="tabContent">
+                        <!-- Configuration Tab -->
+                        <div id="configTab" class="tab-content active">
+                            <form id="flashloanForm" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Loan Amount (SOL)</label>
+                                <input 
+                                    type="number" 
+                                    id="loanAmount" 
+                                    value="5000"
+                                    min="1000"
+                                    max="50000"
+                                    step="100"
+                                    class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-white"
+                                    required
+                                >
+                                <p class="text-xs text-gray-500 mt-1">Fixed amount: 5000 SOL (as per contract)</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Max Slippage (%)</label>
+                                <input 
+                                    type="number" 
+                                    id="maxSlippage" 
+                                    value="0.5"
+                                    min="0.1"
+                                    max="5"
+                                    step="0.1"
+                                    class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-white"
+                                    required
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Min Profit Threshold (SOL)</label>
+                                <input 
+                                    type="number" 
+                                    id="minProfit" 
+                                    value="10"
+                                    min="1"
+                                    max="1000"
+                                    step="1"
+                                    class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-white"
+                                    required
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Trading Pairs</label>
+                                <select 
+                                    id="tradingPairs" 
+                                    multiple
+                                    class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-white"
+                                >
+                                    <option value="SOL/USDC" selected>SOL/USDC</option>
+                                    <option value="SOL/USDT" selected>SOL/USDT</option>
+                                    <option value="RAY/SOL">RAY/SOL</option>
+                                    <option value="SRM/SOL">SRM/SOL</option>
+                                    <option value="MNGO/SOL">MNGO/SOL</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Lending Protocols</label>
+                            <div class="grid grid-cols-3 gap-4">
+                                <label class="flex items-center space-x-3 p-3 border border-gray-300 dark:border-dark-border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg">
+                                    <input type="checkbox" id="customProtocol" checked class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-xs text-white font-bold">C</div>
+                                        <span>Your Contract</span>
+                                    </div>
+                                </label>
+                                <label class="flex items-center space-x-3 p-3 border border-gray-300 dark:border-dark-border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg">
+                                    <input type="checkbox" id="mangoProtocol" checked class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">M</div>
+                                        <span>Mango Markets</span>
+                                    </div>
+                                </label>
+                                <label class="flex items-center space-x-3 p-3 border border-gray-300 dark:border-dark-border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg">
+                                    <input type="checkbox" id="solendProtocol" checked class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-bold">S</div>
+                                        <span>Solend</span>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm font-medium text-purple-800 dark:text-purple-200">Primary Program ID:</span>
+                                    <code class="text-xs bg-purple-100 dark:bg-purple-800 px-2 py-1 rounded font-mono">DBnfVqB47t9am8etkUJ35gb8KbFAbVMvmnxrqt3JD8gV</code>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <button 
+                                type="submit" 
+                                id="startBotBtn"
+                                class="flex-1 bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center space-x-2"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-9-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span>Start Arbitrage Bot</span>
+                            </button>
+                            <button 
+                                type="button" 
+                                id="stopBotBtn"
+                                disabled
+                                class="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center space-x-2"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9l6 6m0-6l-6 6"></path>
+                                </svg>
+                                <span>Stop Bot</span>
+                            </button>
+                        </div>
+                    </form>
+                        </div>
+
+                        <!-- Strategies Tab -->
+                        <div id="strategiesTab" class="tab-content hidden">
+                            <div class="space-y-6">
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Trading Strategies</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="p-4 border border-gray-300 dark:border-dark-border rounded-lg">
+                                            <label class="flex items-center space-x-3 cursor-pointer">
+                                                <input type="radio" name="strategy" value="conservative" checked class="w-4 h-4 text-primary">
+                                                <div>
+                                                    <h4 class="font-medium">Conservative</h4>
+                                                    <p class="text-sm text-gray-600 dark:text-gray-400">Low risk, stable returns</p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                        <div class="p-4 border border-gray-300 dark:border-dark-border rounded-lg">
+                                            <label class="flex items-center space-x-3 cursor-pointer">
+                                                <input type="radio" name="strategy" value="aggressive" class="w-4 h-4 text-primary">
+                                                <div>
+                                                    <h4 class="font-medium">Aggressive</h4>
+                                                    <p class="text-sm text-gray-600 dark:text-gray-400">High risk, high returns</p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                        <div class="p-4 border border-gray-300 dark:border-dark-border rounded-lg">
+                                            <label class="flex items-center space-x-3 cursor-pointer">
+                                                <input type="radio" name="strategy" value="scalping" class="w-4 h-4 text-primary">
+                                                <div>
+                                                    <h4 class="font-medium">Scalping</h4>
+                                                    <p class="text-sm text-gray-600 dark:text-gray-400">Quick, small profits</p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                        <div class="p-4 border border-gray-300 dark:border-dark-border rounded-lg">
+                                            <label class="flex items-center space-x-3 cursor-pointer">
+                                                <input type="radio" name="strategy" value="momentum" class="w-4 h-4 text-primary">
+                                                <div>
+                                                    <h4 class="font-medium">Momentum</h4>
+                                                    <p class="text-sm text-gray-600 dark:text-gray-400">Follow market trends</p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Strategy Parameters</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2">Trade Frequency</label>
+                                            <select class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg">
+                                                <option value="low">Low (1-5 trades/hour)</option>
+                                                <option value="medium" selected>Medium (5-15 trades/hour)</option>
+                                                <option value="high">High (15+ trades/hour)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2">Position Size (%)</label>
+                                            <input type="range" min="10" max="100" value="25" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" id="positionSize">
+                                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                                <span>10%</span>
+                                                <span id="positionSizeValue">25%</span>
+                                                <span>100%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Market Scanning</h3>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <span>Real-time Price Monitoring</span>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" checked class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                            </label>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Liquidity Analysis</span>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" checked class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                            </label>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Multi-DEX Scanning</span>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" checked class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Risk Management Tab -->
+                        <div id="riskTab" class="tab-content hidden">
+                            <div class="space-y-6">
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Risk Controls</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2">Stop Loss (%)</label>
+                                            <input type="number" value="5" min="1" max="20" step="0.5" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2">Take Profit (%)</label>
+                                            <input type="number" value="10" min="5" max="50" step="1" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2">Max Daily Loss (SOL)</label>
+                                            <input type="number" value="100" min="10" max="1000" step="10" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2">Max Concurrent Trades</label>
+                                            <input type="number" value="5" min="1" max="20" step="1" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Emergency Controls</h3>
+                                    <div class="space-y-4">
+                                        <div class="p-4 border border-red-300 dark:border-red-700 rounded-lg bg-red-50 dark:bg-red-900/20">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <h4 class="font-medium text-red-800 dark:text-red-200">Emergency Stop</h4>
+                                                    <p class="text-sm text-red-600 dark:text-red-300">Immediately halt all trading activities</p>
+                                                </div>
+                                                <button class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium">
+                                                    Emergency Stop
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Auto-pause on high volatility</span>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" checked class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Portfolio Allocation</h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <div class="flex justify-between text-sm mb-2">
+                                                <span>SOL/USDC</span>
+                                                <span>40%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                                <div class="bg-primary h-2 rounded-full" style="width: 40%"></div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between text-sm mb-2">
+                                                <span>SOL/USDT</span>
+                                                <span>30%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                                <div class="bg-blue-500 h-2 rounded-full" style="width: 30%"></div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between text-sm mb-2">
+                                                <span>Other Pairs</span>
+                                                <span>30%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                                <div class="bg-green-500 h-2 rounded-full" style="width: 30%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Analytics Tab -->
+                        <div id="analyticsTab" class="tab-content hidden">
+                            <div class="space-y-6">
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Performance Analytics</h3>
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div class="text-center p-4 bg-gray-50 dark:bg-dark-bg rounded-lg">
+                                            <div class="text-2xl font-bold text-primary" id="totalTrades">0</div>
+                                            <div class="text-sm text-gray-500">Total Trades</div>
+                                        </div>
+                                        <div class="text-center p-4 bg-gray-50 dark:bg-dark-bg rounded-lg">
+                                            <div class="text-2xl font-bold text-green-500" id="winRate">0%</div>
+                                            <div class="text-sm text-gray-500">Win Rate</div>
+                                        </div>
+                                        <div class="text-center p-4 bg-gray-50 dark:bg-dark-bg rounded-lg">
+                                            <div class="text-2xl font-bold text-blue-500" id="avgProfit">0 SOL</div>
+                                            <div class="text-sm text-gray-500">Avg Profit</div>
+                                        </div>
+                                        <div class="text-center p-4 bg-gray-50 dark:bg-dark-bg rounded-lg">
+                                            <div class="text-2xl font-bold text-purple-500" id="maxDrawdown">0%</div>
+                                            <div class="text-sm text-gray-500">Max Drawdown</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Trading Heatmap</h3>
+                                    <div class="grid grid-cols-7 gap-1">
+                                        <!-- Generate 35 cells for 5 weeks -->
+                                        <div class="aspect-square bg-gray-100 dark:bg-gray-700 rounded"></div>
+                                        <div class="aspect-square bg-green-200 dark:bg-green-800 rounded"></div>
+                                        <div class="aspect-square bg-green-300 dark:bg-green-700 rounded"></div>
+                                        <div class="aspect-square bg-gray-100 dark:bg-gray-700 rounded"></div>
+                                        <div class="aspect-square bg-green-400 dark:bg-green-600 rounded"></div>
+                                        <div class="aspect-square bg-green-200 dark:bg-green-800 rounded"></div>
+                                        <div class="aspect-square bg-red-200 dark:bg-red-800 rounded"></div>
+                                        <!-- Row 2 -->
+                                        <div class="aspect-square bg-green-300 dark:bg-green-700 rounded"></div>
+                                        <div class="aspect-square bg-green-500 dark:bg-green-500 rounded"></div>
+                                        <div class="aspect-square bg-green-200 dark:bg-green-800 rounded"></div>
+                                        <div class="aspect-square bg-gray-100 dark:bg-gray-700 rounded"></div>
+                                        <div class="aspect-square bg-green-400 dark:bg-green-600 rounded"></div>
+                                        <div class="aspect-square bg-green-300 dark:bg-green-700 rounded"></div>
+                                        <div class="aspect-square bg-green-200 dark:bg-green-800 rounded"></div>
+                                        <!-- Continue pattern for remaining rows -->
+                                        <div class="aspect-square bg-gray-100 dark:bg-gray-700 rounded"></div>
+                                        <div class="aspect-square bg-green-200 dark:bg-green-800 rounded"></div>
+                                        <div class="aspect-square bg-green-400 dark:bg-green-600 rounded"></div>
+                                        <div class="aspect-square bg-green-300 dark:bg-green-700 rounded"></div>
+                                        <div class="aspect-square bg-green-500 dark:bg-green-500 rounded"></div>
+                                        <div class="aspect-square bg-green-200 dark:bg-green-800 rounded"></div>
+                                        <div class="aspect-square bg-gray-100 dark:bg-gray-700 rounded"></div>
+                                    </div>
+                                    <div class="flex justify-between text-xs text-gray-500 mt-2">
+                                        <span>Less</span>
+                                        <span>More</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Market Opportunities</h3>
+                                    <div class="space-y-3" id="marketOpportunities">
+                                        <div class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                                            <div>
+                                                <span class="font-medium text-green-800 dark:text-green-200">SOL/USDC</span>
+                                                <div class="text-sm text-green-600 dark:text-green-300">
+                                                    Raydium → Serum: 0.25% spread
+                                                </div>
+                                            </div>
+                                            <div class="text-green-600 dark:text-green-400 font-bold">+12.5 SOL</div>
+                                        </div>
+                                        <div class="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                                            <div>
+                                                <span class="font-medium text-blue-800 dark:text-blue-200">RAY/SOL</span>
+                                                <div class="text-sm text-blue-600 dark:text-blue-300">
+                                                    Orca → Mango: 0.18% spread
+                                                </div>
+                                            </div>
+                                            <div class="text-blue-600 dark:text-blue-400 font-bold">+9.0 SOL</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Alerts Tab -->
+                        <div id="alertsTab" class="tab-content hidden">
+                            <div class="space-y-6">
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Alert Settings</h3>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center justify-between p-4 border border-gray-300 dark:border-dark-border rounded-lg">
+                                            <div>
+                                                <h4 class="font-medium">Profit Alerts</h4>
+                                                <p class="text-sm text-gray-600 dark:text-gray-400">Get notified when profit exceeds threshold</p>
+                                            </div>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" checked class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                            </label>
+                                        </div>
+                                        <div class="flex items-center justify-between p-4 border border-gray-300 dark:border-dark-border rounded-lg">
+                                            <div>
+                                                <h4 class="font-medium">Loss Alerts</h4>
+                                                <p class="text-sm text-gray-600 dark:text-gray-400">Alert when losses exceed limit</p>
+                                            </div>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" checked class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                            </label>
+                                        </div>
+                                        <div class="flex items-center justify-between p-4 border border-gray-300 dark:border-dark-border rounded-lg">
+                                            <div>
+                                                <h4 class="font-medium">Bot Status Changes</h4>
+                                                <p class="text-sm text-gray-600 dark:text-gray-400">Notify when bot starts/stops</p>
+                                            </div>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" checked class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Recent Alerts</h3>
+                                    <div class="space-y-3" id="recentAlerts">
+                                        <div class="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <div class="font-medium text-green-800 dark:text-green-200">Profit Target Reached</div>
+                                                    <div class="text-sm text-green-600 dark:text-green-300">Daily profit exceeded 50 SOL</div>
+                                                </div>
+                                                <div class="text-xs text-green-500">2 hours ago</div>
+                                            </div>
+                                        </div>
+                                        <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <div class="font-medium text-blue-800 dark:text-blue-200">High Volume Detected</div>
+                                                    <div class="text-sm text-blue-600 dark:text-blue-300">SOL/USDC pair showing increased activity</div>
+                                                </div>
+                                                <div class="text-xs text-blue-500">4 hours ago</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 class="text-lg font-semibold mb-4">Notification Preferences</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2">Alert Frequency</label>
+                                            <select class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg">
+                                                <option>Real-time</option>
+                                                <option selected>Every 5 minutes</option>
+                                                <option>Every 15 minutes</option>
+                                                <option>Hourly</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-2">Profit Alert Threshold (SOL)</label>
+                                            <input type="number" value="25" min="1" max="500" step="1" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-dark-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-dark-bg">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trading Activity -->
+                <div class="mt-8 bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                    <h3 class="text-lg font-semibold mb-4">Recent Trading Activity</h3>
+                    <div class="space-y-3" id="tradingActivity">
+                        <div class="text-center text-gray-500 dark:text-gray-400 py-8">
+                            No trading activity yet. Start the bot to begin arbitrage trading.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="space-y-6">
+                <!-- Loan Status -->
+                <div class="bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                    <h3 class="text-lg font-semibold mb-4">Current Loan Status</h3>
+                    <div id="loanStatus" class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Status:</span>
+                            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                                No Active Loan
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Amount:</span>
+                            <span class="font-medium">0 SOL</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Duration:</span>
+                            <span class="font-medium">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profit Chart -->
+                <div class="bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                    <h3 class="text-lg font-semibold mb-4">Profit Tracking</h3>
+                    <div class="h-48">
+                        <canvas id="profitChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Profit & Destination Wallet -->
+                <div class="bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                    <h3 class="text-lg font-semibold mb-4">Profit Distribution</h3>
+                    
+                    <!-- Destination Wallet -->
+                    <div class="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-purple-800 dark:text-purple-200">Destination Wallet:</span>
+                            <span class="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-300">
+                                Phantom
+                            </span>
+                        </div>
+                        <div class="text-xs font-mono bg-purple-100 dark:bg-purple-800 px-2 py-1 rounded" id="destinationWallet">
+                            <!-- UPDATE THIS WITH YOUR SOLANA PLAYGROUND WALLET ADDRESS -->
+                            YOUR_SOLANA_PLAYGROUND_WALLET_ADDRESS_HERE
+                        </div>
+                        <div class="text-xs text-purple-600 dark:text-purple-400 mt-1">All profits automatically sent here</div>
+                    </div>
+
+                    <!-- Available Balance -->
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Available Profit:</span>
+                            <span class="font-bold text-green-500" id="availableProfit">0 SOL</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">USD Value:</span>
+                            <span class="font-medium" id="availableProfitUSD">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Auto-Transfer Status -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                            <div>
+                                <h4 class="font-medium text-green-800 dark:text-green-200">Auto-Transfer</h4>
+                                <p class="text-sm text-green-600 dark:text-green-300">Profits sent automatically every 50 SOL</p>
+                            </div>
+                            <div class="text-green-600 dark:text-green-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <button 
+                            id="manualTransferBtn" 
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center space-x-2"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                            <span>Transfer Now</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Transaction History -->
+                <div class="bg-white dark:bg-dark-card rounded-xl p-6 border border-gray-200 dark:border-dark-border shadow-sm">
+                    <h3 class="text-lg font-semibold mb-4">Recent Transfers</h3>
+                    <div class="space-y-3" id="transactionHistory">
+                        <div class="text-center text-gray-500 dark:text-gray-400 py-4 text-sm">
+                            No transfers yet
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode detection and handling
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // =====================================================
+        // CONFIGURATION - UPDATE YOUR WALLET ADDRESS HERE
+        // =====================================================
+        
+        // 🔧 YOUR PHANTOM WALLET ADDRESS
+        const DESTINATION_WALLET = '2ffNhLB6SuyTyEnU1NC8iLuknq3J9mUXjEcHqYoAYFiA';
+        
+        // Auto-transfer settings
+        const AUTO_TRANSFER_THRESHOLD = 50; // SOL
+        const MANUAL_TRANSFER_MINIMUM = 0.1; // SOL
+
+        // Application state
+        let botActive = false;
+        let currentLoan = null;
+        let tradingHistory = [];
+        let profitData = [];
+        let totalProfit = 0;
+        let successfulTrades = 0;
+        let totalTrades = 0;
+        let transferHistory = [];
+
+        // Flash loan statuses from the Rust contract
+        const FlashloanStatus = {
+            PENDING: 'Pending',
+            APPROVED: 'Approved', 
+            REPAID: 'Repaid',
+            FAILED: 'Failed'
+        };
+
+        // DOM elements
+        const startBotBtn = document.getElementById('startBotBtn');
+        const stopBotBtn = document.getElementById('stopBotBtn');
+        const flashloanForm = document.getElementById('flashloanForm');
+        const activeLoanCount = document.getElementById('activeLoanCount');
+        const totalProfitEl = document.getElementById('totalProfit');
+        const successRateEl = document.getElementById('successRate');
+        const botStatusEl = document.getElementById('botStatus');
+        const botStatusIndicator = document.getElementById('botStatusIndicator');
+        const loanStatusEl = document.getElementById('loanStatus');
+        const tradingActivityEl = document.getElementById('tradingActivity');
+        const availableProfitEl = document.getElementById('availableProfit');
+        const availableProfitUSDEl = document.getElementById('availableProfitUSD');
+        const manualTransferBtn = document.getElementById('manualTransferBtn');
+        const transactionHistoryEl = document.getElementById('transactionHistory');
+
+        // Initialize profit chart
+        const ctx = document.getElementById('profitChart').getContext('2d');
+        const profitChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Cumulative Profit (SOL)',
+                    data: [],
+                    borderColor: '#5D5CDE',
+                    backgroundColor: 'rgba(93, 92, 222, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(156, 163, 175, 0.1)'
+                        },
+                        ticks: {
+                            color: '#9CA3AF',
+                            font: {
+                                size: 11
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(156, 163, 175, 0.1)'
+                        },
+                        ticks: {
+                            color: '#9CA3AF',
+                            font: {
+                                size: 11
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Initialize destination wallet display
+        document.getElementById('destinationWallet').textContent = DESTINATION_WALLET;
+
+        // Form submission handler
+        flashloanForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!botActive) {
+                await startBot();
+            }
+        });
+
+        // Stop bot handler
+        stopBotBtn.addEventListener('click', async () => {
+            await stopBot();
+        });
+
+        // Manual transfer handler
+        manualTransferBtn.addEventListener('click', async () => {
+            await executeManualTransfer();
+        });
+
+        async function startBot() {
+            const loanAmount = document.getElementById('loanAmount').value;
+            const maxSlippage = document.getElementById('maxSlippage').value;
+            const minProfit = document.getElementById('minProfit').value;
+
+            // Validate loan amount (from contract requirement)
+            if (parseInt(loanAmount) !== 5000) {
+                showNotification('Invalid loan amount. Must be exactly 5000 SOL as per contract.', 'error');
+                return;
+            }
+
+            // Check if destination wallet is configured
+            if (DESTINATION_WALLET === 'YOUR_SOLANA_PLAYGROUND_WALLET_ADDRESS_HERE') {
+                showNotification('Please update DESTINATION_WALLET with your Solana Playground address', 'error');
+                return;
+            }
+
+            botActive = true;
+            updateBotStatus();
+            
+            // Create flash loan request
+            currentLoan = {
+                user: DESTINATION_WALLET,
+                loan_amount: parseInt(loanAmount),
+                status: FlashloanStatus.PENDING,
+                timestamp: new Date()
+            };
+
+            showNotification('Initiating flash loan request...', 'info');
+            
+            // Simulate loan approval process
+            setTimeout(() => {
+                currentLoan.status = FlashloanStatus.APPROVED;
+                updateLoanStatus();
+                showNotification('Flash loan approved! Starting arbitrage trading...', 'success');
+                
+                // Start trading simulation
+                startTradingSimulation();
+            }, 2000);
+        }
+
+        async function stopBot() {
+            botActive = false;
+            updateBotStatus();
+            
+            if (currentLoan && currentLoan.status === FlashloanStatus.APPROVED) {
+                showNotification('Repaying flash loan...', 'info');
+                
+                setTimeout(() => {
+                    currentLoan.status = FlashloanStatus.REPAID;
+                    updateLoanStatus();
+                    showNotification('Flash loan repaid successfully!', 'success');
+                    currentLoan = null;
+                }, 1500);
+            }
+        }
+
+        function startTradingSimulation() {
+            if (!botActive) return;
+
+            // Simulate arbitrage opportunity detection and execution
+            const tradingInterval = setInterval(() => {
+                if (!botActive) {
+                    clearInterval(tradingInterval);
+                    return;
+                }
+
+                // Simulate random trading opportunity
+                if (Math.random() > 0.3) { // 70% chance of finding opportunity
+                    executeTrade();
+                }
+            }, 3000 + Math.random() * 7000); // Random interval between 3-10 seconds
+        }
+
+        function executeTrade() {
+            const pairs = ['SOL/USDC', 'SOL/USDT', 'RAY/SOL', 'SRM/SOL'];
+            const selectedPair = pairs[Math.floor(Math.random() * pairs.length)];
+            const protocols = ['Your Contract', 'Mango Markets', 'Solend', 'Serum DEX', 'Raydium'];
+            const buyProtocol = protocols[Math.floor(Math.random() * protocols.length)];
+            const sellProtocol = protocols[Math.floor(Math.random() * protocols.length)];
+            
+            // Simulate profit/loss (mostly profitable with some losses)
+            const isSuccessful = Math.random() > 0.15; // 85% success rate
+            const profitAmount = isSuccessful 
+                ? (Math.random() * 50 + 5) // 5-55 SOL profit
+                : -(Math.random() * 20 + 2); // 2-22 SOL loss
+
+            const trade = {
+                id: Date.now(),
+                timestamp: new Date(),
+                pair: selectedPair,
+                buyProtocol,
+                sellProtocol,
+                profit: profitAmount,
+                successful: isSuccessful
+            };
+
+            tradingHistory.unshift(trade);
+            totalProfit += profitAmount;
+            totalTrades++;
+            if (isSuccessful) successfulTrades++;
+
+            updateStats();
+            updateTradingActivity();
+            updateProfitChart();
+            updateProfitBalance();
+
+            const status = isSuccessful ? 'success' : 'error';
+            const message = isSuccessful 
+                ? `Profitable arbitrage: +${profitAmount.toFixed(2)} SOL on ${selectedPair}`
+                : `Trade loss: ${profitAmount.toFixed(2)} SOL on ${selectedPair}`;
+            
+            showNotification(message, status);
+
+            // Check for auto-transfer
+            checkAutoTransfer();
+        }
+
+        function updateBotStatus() {
+            if (botActive) {
+                botStatusEl.innerHTML = '<span class="text-green-500">Active</span>';
+                botStatusIndicator.className = 'w-3 h-3 bg-green-500 rounded-full pulse-primary';
+                startBotBtn.disabled = true;
+                stopBotBtn.disabled = false;
+                startBotBtn.className = startBotBtn.className.replace('bg-primary hover:bg-primary/90', 'bg-gray-400 cursor-not-allowed');
+            } else {
+                botStatusEl.innerHTML = '<span class="text-red-500">Inactive</span>';
+                botStatusIndicator.className = 'w-3 h-3 bg-red-500 rounded-full';
+                startBotBtn.disabled = false;
+                stopBotBtn.disabled = true;
+                startBotBtn.className = startBotBtn.className.replace('bg-gray-400 cursor-not-allowed', 'bg-primary hover:bg-primary/90');
+            }
+        }
+
+        function updateLoanStatus() {
+            if (!currentLoan) {
+                loanStatusEl.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Status:</span>
+                        <span class="px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                            No Active Loan
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Amount:</span>
+                        <span class="font-medium">0 SOL</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Duration:</span>
+                        <span class="font-medium">--</span>
+                    </div>
+                `;
+                activeLoanCount.textContent = '0';
+                return;
+            }
+
+            const statusColors = {
+                [FlashloanStatus.PENDING]: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300',
+                [FlashloanStatus.APPROVED]: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300',
+                [FlashloanStatus.REPAID]: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300',
+                [FlashloanStatus.FAILED]: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+            };
+
+            const duration = currentLoan.timestamp ? 
+                Math.floor((Date.now() - currentLoan.timestamp.getTime()) / 1000) + 's' : '--';
+
+            loanStatusEl.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Status:</span>
+                    <span class="px-2 py-1 text-xs rounded-full ${statusColors[currentLoan.status]}">
+                        ${currentLoan.status}
+                    </span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Amount:</span>
+                    <span class="font-medium">${currentLoan.loan_amount.toLocaleString()} SOL</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Duration:</span>
+                    <span class="font-medium">${duration}</span>
+                </div>
+            `;
+
+            activeLoanCount.textContent = currentLoan.status === FlashloanStatus.APPROVED ? '1' : '0';
+        }
+
+        function updateStats() {
+            totalProfitEl.textContent = `$${(totalProfit * 25).toFixed(2)}`; // Assume 1 SOL = $25
+            successRateEl.textContent = totalTrades > 0 ? `${Math.round((successfulTrades / totalTrades) * 100)}%` : '0%';
+        }
+
+        function updateProfitBalance() {
+            const transferredAmount = getTransferredAmount();
+            const availableProfit = Math.max(0, totalProfit - transferredAmount);
+            
+            availableProfitEl.textContent = `${availableProfit.toFixed(2)} SOL`;
+            availableProfitUSDEl.textContent = `$${(availableProfit * 25).toFixed(2)}`;
+        }
+
+        function getTransferredAmount() {
+            return transferHistory.reduce((total, transfer) => total + transfer.amount, 0);
+        }
+
+        function updateTradingActivity() {
+            if (tradingHistory.length === 0) {
+                tradingActivityEl.innerHTML = `
+                    <div class="text-center text-gray-500 dark:text-gray-400 py-8">
+                        No trading activity yet. Start the bot to begin arbitrage trading.
+                    </div>
+                `;
+                return;
+            }
+
+            const recentTrades = tradingHistory.slice(0, 10);
+            tradingActivityEl.innerHTML = recentTrades.map(trade => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-bg rounded-lg slide-up">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-2 h-2 rounded-full ${trade.successful ? 'bg-green-500' : 'bg-red-500'}"></div>
+                        <div>
+                            <p class="font-medium text-sm">${trade.pair}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                ${trade.buyProtocol} → ${trade.sellProtocol}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-medium text-sm ${trade.successful ? 'text-green-500' : 'text-red-500'}">
+                            ${trade.successful ? '+' : ''}${trade.profit.toFixed(2)} SOL
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            ${trade.timestamp.toLocaleTimeString()}
+                        </p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateProfitChart() {
+            const now = new Date();
+            profitData.push({
+                time: now.toLocaleTimeString(),
+                profit: totalProfit
+            });
+
+            // Keep only last 20 data points
+            if (profitData.length > 20) {
+                profitData.shift();
+            }
+
+            profitChart.data.labels = profitData.map(d => d.time);
+            profitChart.data.datasets[0].data = profitData.map(d => d.profit);
+            profitChart.update('none');
+        }
+
+        function checkAutoTransfer() {
+            const transferredAmount = getTransferredAmount();
+            const availableProfit = totalProfit - transferredAmount;
+            
+            if (availableProfit >= AUTO_TRANSFER_THRESHOLD) {
+                executeAutoTransfer(availableProfit);
+            }
+        }
+
+        async function executeAutoTransfer(amount) {
+            showNotification(`Auto-transferring ${amount.toFixed(2)} SOL to your wallet...`, 'info');
+            
+            // Simulate transfer to Solana Playground wallet
+            setTimeout(() => {
+                const transfer = {
+                    id: Date.now(),
+                    type: 'auto-transfer',
+                    amount: amount,
+                    recipient: DESTINATION_WALLET,
+                    txHash: generateTransactionHash(),
+                    timestamp: new Date(),
+                    status: 'completed'
+                };
+                
+                transferHistory.push(transfer);
+                addTransferToHistory(transfer);
+                updateProfitBalance();
+                
+                showNotification(`Successfully transferred ${amount.toFixed(2)} SOL to your Playground wallet!`, 'success');
+            }, 3000);
+        }
+
+        async function executeManualTransfer() {
+            const transferredAmount = getTransferredAmount();
+            const availableProfit = totalProfit - transferredAmount;
+            
+            if (availableProfit < MANUAL_TRANSFER_MINIMUM) {
+                showNotification(`Minimum transfer amount is ${MANUAL_TRANSFER_MINIMUM} SOL`, 'error');
+                return;
+            }
+
+            if (DESTINATION_WALLET === 'YOUR_SOLANA_PLAYGROUND_WALLET_ADDRESS_HERE') {
+                showNotification('Please update DESTINATION_WALLET with your Solana Playground address', 'error');
+                return;
+            }
+
+            showNotification(`Manually transferring ${availableProfit.toFixed(2)} SOL to your wallet...`, 'info');
+            
+            // Simulate transfer to Solana Playground wallet
+            setTimeout(() => {
+                const transfer = {
+                    id: Date.now(),
+                    type: 'manual-transfer',
+                    amount: availableProfit,
+                    recipient: DESTINATION_WALLET,
+                    txHash: generateTransactionHash(),
+                    timestamp: new Date(),
+                    status: 'completed'
+                };
+                
+                transferHistory.push(transfer);
+                addTransferToHistory(transfer);
+                updateProfitBalance();
+                
+                showNotification(`Successfully transferred ${availableProfit.toFixed(2)} SOL to your Playground wallet!`, 'success');
+            }, 3000);
+        }
+
+        function generateTransactionHash() {
+            const chars = '0123456789abcdef';
+            let hash = '';
+            for (let i = 0; i < 64; i++) {
+                hash += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return hash;
+        }
+
+        function addTransferToHistory(transfer) {
+            const transferEl = document.createElement('div');
+            transferEl.className = 'flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-bg rounded-lg slide-up';
+            
+            const typeText = transfer.type === 'auto-transfer' ? 'Auto Transfer' : 'Manual Transfer';
+            const statusColor = transfer.status === 'completed' ? 'text-green-500' : 'text-yellow-500';
+            const statusIcon = transfer.status === 'completed' ? '✓' : '⧗';
+            
+            transferEl.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="w-2 h-2 rounded-full bg-purple-500"></div>
+                    <div>
+                        <p class="font-medium text-sm">${typeText}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            ${transfer.txHash.slice(0, 8)}...${transfer.txHash.slice(-8)}
+                        </p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="font-medium text-sm ${statusColor}">
+                        ${statusIcon} ${transfer.amount.toFixed(2)} SOL
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        ${transfer.timestamp.toLocaleTimeString()}
+                    </p>
+                </div>
+            `;
+            
+            // Add to top of transaction history
+            if (transactionHistoryEl.children.length === 1 && transactionHistoryEl.children[0].textContent.includes('No transfers')) {
+                transactionHistoryEl.innerHTML = '';
+            }
+            
+            transactionHistoryEl.insertBefore(transferEl, transactionHistoryEl.firstChild);
+            
+            // Keep only last 5 transfers
+            const transfers = transactionHistoryEl.children;
+            if (transfers.length > 5) {
+                transactionHistoryEl.removeChild(transfers[transfers.length - 1]);
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500', 
+                info: 'bg-blue-500',
+                warning: 'bg-yellow-500'
+            };
+
+            notification.className = `fixed top-20 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-sm slide-up`;
+            notification.textContent = message;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => notification.remove(), 300);
+            }, 4000);
+        }
+
+        // Tab functionality
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabName = this.dataset.tab;
+                
+                // Update tab buttons
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('active', 'border-primary', 'text-primary');
+                    b.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'dark:text-gray-400', 'dark:hover:text-gray-300');
+                });
+                this.classList.add('active', 'border-primary', 'text-primary');
+                this.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'dark:text-gray-400', 'dark:hover:text-gray-300');
+                
+                // Show/hide tab content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                    content.classList.remove('active');
+                });
+                
+                const targetTab = document.getElementById(tabName + 'Tab');
+                if (targetTab) {
+                    targetTab.classList.remove('hidden');
+                    targetTab.classList.add('active');
+                }
+            });
+        });
+
+        // Position size slider
+        const positionSizeSlider = document.getElementById('positionSize');
+        const positionSizeValue = document.getElementById('positionSizeValue');
+        
+        if (positionSizeSlider && positionSizeValue) {
+            positionSizeSlider.addEventListener('input', function() {
+                positionSizeValue.textContent = this.value + '%';
+            });
+        }
+
+        // Advanced trading features
+        let marketScanner = null;
+        let riskManager = null;
+        let alertSystem = null;
+
+        // Market Scanner
+        function startMarketScanner() {
+            if (marketScanner) return;
+            
+            marketScanner = setInterval(() => {
+                updateMarketOpportunities();
+                analyzeVolatility();
+            }, 5000);
+        }
+
+        function stopMarketScanner() {
+            if (marketScanner) {
+                clearInterval(marketScanner);
+                marketScanner = null;
+            }
+        }
+
+        function updateMarketOpportunities() {
+            const opportunities = [
+                { pair: 'SOL/USDC', route: 'Raydium → Serum', spread: 0.25, profit: 12.5 },
+                { pair: 'RAY/SOL', route: 'Orca → Mango', spread: 0.18, profit: 9.0 },
+                { pair: 'SRM/SOL', route: 'Serum → Orca', spread: 0.32, profit: 16.8 },
+                { pair: 'MNGO/SOL', route: 'Mango → Raydium', spread: 0.15, profit: 7.5 }
+            ];
+
+            const marketOpportunitiesEl = document.getElementById('marketOpportunities');
+            if (!marketOpportunitiesEl) return;
+
+            // Randomly select 2-3 opportunities
+            const selectedOpportunities = opportunities
+                .sort(() => Math.random() - 0.5)
+                .slice(0, Math.floor(Math.random() * 2) + 2);
+
+            marketOpportunitiesEl.innerHTML = selectedOpportunities.map(opp => `
+                <div class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                    <div>
+                        <span class="font-medium text-green-800 dark:text-green-200">${opp.pair}</span>
+                        <div class="text-sm text-green-600 dark:text-green-300">
+                            ${opp.route}: ${opp.spread}% spread
+                        </div>
+                    </div>
+                    <div class="text-green-600 dark:text-green-400 font-bold">+${opp.profit} SOL</div>
+                </div>
+            `).join('');
+        }
+
+        // Risk Management
+        function initializeRiskManager() {
+            riskManager = {
+                dailyLoss: 0,
+                maxDailyLoss: 100,
+                openPositions: 0,
+                maxPositions: 5,
+                stopLoss: 5,
+                takeProfit: 10
+            };
+        }
+
+        function checkRiskLimits(trade) {
+            if (!riskManager) return true;
+
+            // Check daily loss limit
+            if (riskManager.dailyLoss >= riskManager.maxDailyLoss) {
+                showNotification('Daily loss limit reached. Trading paused.', 'warning');
+                return false;
+            }
+
+            // Check max positions
+            if (riskManager.openPositions >= riskManager.maxPositions) {
+                showNotification('Maximum concurrent positions reached.', 'warning');
+                return false;
+            }
+
+            return true;
+        }
+
+        // Alert System
+        function initializeAlertSystem() {
+            alertSystem = {
+                profitThreshold: 25,
+                lossThreshold: 50,
+                volumeThreshold: 1000000
+            };
+        }
+
+        function checkAlerts(trade) {
+            if (!alertSystem) return;
+
+            // Profit alert
+            if (trade.profit > alertSystem.profitThreshold) {
+                addAlert('Profit Target Reached', `Trade profit of ${trade.profit.toFixed(2)} SOL exceeded threshold`, 'success');
+            }
+
+            // Loss alert
+            if (trade.profit < -alertSystem.lossThreshold) {
+                addAlert('Large Loss Detected', `Trade loss of ${Math.abs(trade.profit).toFixed(2)} SOL`, 'error');
+            }
+        }
+
+        function addAlert(title, message, type) {
+            const alertsContainer = document.getElementById('recentAlerts');
+            if (!alertsContainer) return;
+
+            const alertEl = document.createElement('div');
+            const colors = {
+                success: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700',
+                error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700',
+                warning: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700',
+                info: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
+            };
+
+            const textColors = {
+                success: 'text-green-800 dark:text-green-200',
+                error: 'text-red-800 dark:text-red-200',
+                warning: 'text-yellow-800 dark:text-yellow-200',
+                info: 'text-blue-800 dark:text-blue-200'
+            };
+
+            alertEl.className = `p-4 ${colors[type]} border rounded-lg slide-up`;
+            alertEl.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="font-medium ${textColors[type]}">${title}</div>
+                        <div class="text-sm ${textColors[type].replace('800', '600').replace('200', '300')}">${message}</div>
+                    </div>
+                    <div class="text-xs ${textColors[type].replace('800', '500').replace('200', '400')}">Just now</div>
+                </div>
+            `;
+
+            // Add to top of alerts
+            alertsContainer.insertBefore(alertEl, alertsContainer.firstChild);
+
+            // Keep only last 5 alerts
+            const alerts = alertsContainer.children;
+            if (alerts.length > 5) {
+                alertsContainer.removeChild(alerts[alerts.length - 1]);
+            }
+        }
+
+        // Analytics
+        function updateAnalytics() {
+            const totalTradesEl = document.getElementById('totalTrades');
+            const winRateEl = document.getElementById('winRate');
+            const avgProfitEl = document.getElementById('avgProfit');
+            const maxDrawdownEl = document.getElementById('maxDrawdown');
+
+            if (totalTradesEl) totalTradesEl.textContent = totalTrades;
+            if (winRateEl) winRateEl.textContent = totalTrades > 0 ? `${Math.round((successfulTrades / totalTrades) * 100)}%` : '0%';
+            if (avgProfitEl) avgProfitEl.textContent = totalTrades > 0 ? `${(totalProfit / totalTrades).toFixed(2)} SOL` : '0 SOL';
+            if (maxDrawdownEl) {
+                // Calculate max drawdown (simplified)
+                const drawdown = Math.min(0, ...tradingHistory.map(t => t.profit));
+                maxDrawdownEl.textContent = `${Math.abs(drawdown).toFixed(1)}%`;
+            }
+        }
+
+        // Enhanced trade execution with new features
+        function executeTradeEnhanced() {
+            if (!checkRiskLimits()) return;
+
+            const pairs = ['SOL/USDC', 'SOL/USDT', 'RAY/SOL', 'SRM/SOL'];
+            const selectedPair = pairs[Math.floor(Math.random() * pairs.length)];
+            const protocols = ['Your Contract', 'Mango Markets', 'Solend', 'Serum DEX', 'Raydium', 'Orca'];
+            const buyProtocol = protocols[Math.floor(Math.random() * protocols.length)];
+            const sellProtocol = protocols[Math.floor(Math.random() * protocols.length)];
+            
+            // Get selected strategy
+            const strategy = document.querySelector('input[name="strategy"]:checked')?.value || 'conservative';
+            
+            // Adjust success rate and profit based on strategy
+            let successRate = 0.85;
+            let profitMultiplier = 1;
+            
+            switch (strategy) {
+                case 'aggressive':
+                    successRate = 0.75;
+                    profitMultiplier = 1.5;
+                    break;
+                case 'scalping':
+                    successRate = 0.90;
+                    profitMultiplier = 0.5;
+                    break;
+                case 'momentum':
+                    successRate = 0.80;
+                    profitMultiplier = 1.2;
+                    break;
+            }
+
+            const isSuccessful = Math.random() < successRate;
+            const baseProfitAmount = isSuccessful 
+                ? (Math.random() * 50 + 5) * profitMultiplier
+                : -(Math.random() * 20 + 2);
+
+            const trade = {
+                id: Date.now(),
+                timestamp: new Date(),
+                pair: selectedPair,
+                buyProtocol,
+                sellProtocol,
+                profit: baseProfitAmount,
+                successful: isSuccessful,
+                strategy: strategy
+            };
+
+            tradingHistory.unshift(trade);
+            totalProfit += baseProfitAmount;
+            totalTrades++;
+            if (isSuccessful) successfulTrades++;
+
+            // Update risk manager
+            if (riskManager) {
+                if (!isSuccessful) {
+                    riskManager.dailyLoss += Math.abs(baseProfitAmount);
+                }
+                riskManager.openPositions = Math.max(0, riskManager.openPositions + (isSuccessful ? -1 : 1));
+            }
+
+            updateStats();
+            updateAnalytics();
+            updateTradingActivity();
+            updateProfitChart();
+            updateProfitBalance();
+            checkAlerts(trade);
+
+            const status = isSuccessful ? 'success' : 'error';
+            const message = isSuccessful 
+                ? `${strategy.toUpperCase()}: +${baseProfitAmount.toFixed(2)} SOL on ${selectedPair}`
+                : `${strategy.toUpperCase()}: ${baseProfitAmount.toFixed(2)} SOL loss on ${selectedPair}`;
+            
+            showNotification(message, status);
+
+            // Check for auto-transfer
+            checkAutoTransfer();
+        }
+
+        // Volatility analysis
+        function analyzeVolatility() {
+            // Simulate volatility detection
+            if (Math.random() > 0.95) { // 5% chance of high volatility
+                const autoPauseEnabled = document.querySelector('#riskTab input[type="checkbox"]')?.checked;
+                if (autoPauseEnabled && botActive) {
+                    showNotification('High volatility detected! Auto-pausing trading.', 'warning');
+                    stopBot();
+                }
+            }
+        }
+
+        // Emergency stop functionality
+        document.addEventListener('click', function(e) {
+            if (e.target.textContent === 'Emergency Stop') {
+                e.preventDefault();
+                if (botActive) {
+                    showNotification('EMERGENCY STOP ACTIVATED!', 'error');
+                    stopBot();
+                    addAlert('Emergency Stop', 'All trading activities halted immediately', 'error');
+                }
+            }
+        });
+
+        // Override the original executeTrade function
+        const originalExecuteTrade = executeTrade;
+        executeTrade = executeTradeEnhanced;
+
+        // Initialize advanced features
+        initializeRiskManager();
+        initializeAlertSystem();
+        startMarketScanner();
+
+        // =====================================================
+        // YOUR REAL PROGRAM INTEGRATION
+        // =====================================================
+
+        // Solana Web3 Configuration
+        const SOLANA_NETWORK = 'mainnet-beta'; // Change to 'devnet' for testing
+        const RPC_ENDPOINT = 'https://api.mainnet-beta.solana.com';
+        let connection = null;
+
+        // Protocol Addresses (Your Real Program ID Integrated)
+        const PROTOCOL_CONFIG = {
+            // Your Custom Flash Loan Program - PRIMARY
+            CUSTOM_FLASHLOAN: {
+                PROGRAM_ID: 'DBnfVqB47t9am8etkUJ35gb8KbFAbVMvmnxrqt3JD8gV',
+                AUTHORITY: 'DBnfVqB47t9am8etkUJ35gb8KbFAbVMvmnxrqt3JD8gV',
+                CONFIG_ACCOUNT: 'DBnfVqB47t9am8etkUJ35gb8KbFAbVMvmnxrqt3JD8gV'
+            },
+            SOLEND: {
+                PROGRAM_ID: 'So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo',
+                MARKET_AUTHORITY: '3DpKVGUAl4QaFJCh8nKMi5m6q3nWpBEU9vUwkKvLCWbX',
+                SOL_RESERVE: '8PbodeaosQP19SjYFx855UMqWxH2HynZLdBXmsrbac36',
+                USDC_RESERVE: 'BgxfHJDzm44T7XG68MYKx7YisTjZu73tVovyZSjJMpmw'
+            },
+            MANGO: {
+                PROGRAM_ID: '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg',
+                GROUP: '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYjRVPiKp1CN',
+                CACHE: '6XMcoSV4VpZi1qHuJ67rGz3dZa7yWkkBFd2oaVwHZKWR'
+            },
+            TOKENS: {
+                SOL: 'So11111111111111111111111111111111111111112',
+                USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+            }
+        };
+
+        // Initialize the application
+        updateBotStatus();
+        updateLoanStatus();
+        updateStats();
+        updateAnalytics();
+        updateMarketOpportunities();
+        updateProfitBalance();
+    </script>
+</body>
+</html>
